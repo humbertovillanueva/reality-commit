@@ -1,0 +1,2 @@
+/* Markers use image-relative coordinates; never letterbox the image. */
+.evidence-image img { max-height: none; height: auto; }
