@@ -35,6 +35,8 @@ npm run build
 
 ## Try it
 
+The introduction is a five-screen walkthrough: Welcome → Capture → Compare → Remember → Get started. Next, Back, and clickable progress indicators move between screens; each step has a bookmarkable URL (`/#intro/1` through `/#intro/5`) and supports browser Back. The logo animation respects reduced-motion preferences and never delays entry. Skip intro opens the workspace immediately. The final screen explains manual observations and browser-only storage, then offers a sample workspace or photo upload. Returning visitors can continue their saved work. The workspace logo returns to the introduction; `/#workspace` opens the workspace directly.
+
 1. Explore the four proposals in the sample workspace.
 2. Write a verification note, then accept a proposal—or reject it.
 3. Resolve all four proposals and select **Commit review**.

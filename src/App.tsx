@@ -3,12 +3,15 @@ import { ArrowDownToLine, ArrowLeft, ArrowRight, Box, Camera, Check, CheckCheck,
 import { compareCaptures, createCommit, kindLabel, type Capture, type Change, type Decision, type Observation, type Workspace } from './domain';
 import { demoWorkspace } from './demo';
 import { loadWorkspace, saveWorkspace } from './storage';
+import Welcome from './Welcome';
 
 const date = (value: string) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong.';
 type View = 'compare' | 'assets' | 'history';
 
 export default function App() {
+  const [showWelcome, setShowWelcome] = useState(() => window.location.hash !== '#workspace');
+  const navigationFocus = useRef(false);
   const [workspace, setWorkspace] = useState<Workspace>();
   const [view, setView] = useState<View>('compare');
   const [beforeId, setBeforeId] = useState('baseline');
@@ -23,6 +26,26 @@ export default function App() {
   const [inspectCommit, setInspectCommit] = useState<string>();
   const [reviewer, setReviewer] = useState('');
   const [commitTitle, setCommitTitle] = useState('');
+  useEffect(() => {
+    const syncPage = () => { navigationFocus.current = true; setShowWelcome(window.location.hash !== '#workspace'); };
+    window.addEventListener('hashchange', syncPage);
+    return () => window.removeEventListener('hashchange', syncPage);
+  }, []);
+  useEffect(() => {
+    if (!workspace || !navigationFocus.current) return;
+    if (upload) { navigationFocus.current = false; return; }
+    const heading = document.querySelector<HTMLElement>('h1');
+    heading?.setAttribute('tabindex', '-1');
+    heading?.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+    navigationFocus.current = false;
+  }, [showWelcome, workspace, upload]);
+  function enterWorkspace(capture = false) {
+    navigationFocus.current = true;
+    window.location.hash = 'workspace';
+    setShowWelcome(false);
+    if (capture) setUpload(true);
+  }
   useEffect(() => { loadWorkspace().then(saved => {
     const w = saved ?? demoWorkspace(); setWorkspace(w);
     setBeforeId(w.captures.at(-2)?.id ?? w.captures[0]?.id ?? ''); setAfterId(w.captures.at(-1)?.id ?? '');
@@ -65,9 +88,10 @@ export default function App() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(workspace, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'reality-commit-export.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  if (showWelcome) return <Welcome hasSavedWorkspace={!workspace.demo || workspace.commits.length > 0} onExplore={() => enterWorkspace()} onCapture={() => enterWorkspace(true)} />;
   return <div className="app">
     <aside className="sidebar">
-      <a className="brand" href="#" onClick={e => {e.preventDefault();setView('compare');}}><span className="brand-icon"><GitCommitHorizontal/></span><span>reality<span className="brand-light">commit</span><small>PHYSICAL WORLD · VERSIONED</small></span></a>
+      <a className="brand" href="#" aria-label="Reality Commit introduction"><span className="brand-icon"><img src="./mark.svg" alt="" width="32" height="32"/></span><span>reality<span className="brand-light">commit</span><small>PHYSICAL WORLD · VERSIONED</small></span></a>
       <div className="workspace-label">WORKSPACE <span>LOCAL</span></div>
       <div className="workspace-name"><span className="plant-icon"><Layers3 size={18}/></span><div>{workspace.demo ? 'North plant' : workspace.name}<small>{workspace.demo ? 'Mechanical room · Sample site' : 'Private browser workspace'}</small></div></div>
       <nav aria-label="Main navigation">
