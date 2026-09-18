@@ -1,2 +1,11 @@
 /* Markers use image-relative coordinates; never letterbox the image. */
 .evidence-image img { max-height: none; height: auto; }
+.photo-credits { font-size:12px; line-height:1.7; color:#52665b; }
+.photo-credits a, .demo-context a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.demo-context { border:1px solid #dce3d9; background:#f0f4e9; border-radius:12px; padding:24px; margin:20px 0; }
+.demo-context h2 { font-size:22px; margin:8px 0; }
+.demo-context p { font-size:14px; line-height:1.7; max-width:100ch; }
+.maintenance-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; margin:20px 0; }
+.maintenance-grid h3 { font-size:15px; margin:0; }
+.demo-context summary { cursor:pointer; font-size:13px; font-weight:600; }
+@media(max-width:800px) { .maintenance-grid { grid-template-columns:1fr; gap:12px; } .demo-context { padding:18px; } }

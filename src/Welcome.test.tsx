@@ -8,6 +8,13 @@ const render = (step = 0, saved = false) => renderToStaticMarkup(
 );
 
 describe('Welcome experience', () => {
+  it('places Next and Skip together below the opening invitation', () => {
+    const html = render();
+    expect(html).toContain('intro-opening-actions');
+    expect(html.indexOf('intro-opening-actions')).toBeGreaterThan(html.indexOf('Let’s take a quick look around.'));
+    expect(html).toContain('Next');
+    expect(html).toContain('Skip intro');
+  });
   it('explains the product before asking a new visitor to enter', () => {
     const html = render();
     expect(html).toContain('A photo diary for buildings and equipment.');
@@ -34,8 +41,8 @@ describe('Welcome experience', () => {
 
   it('uses accessible example images on the comparison screen', () => {
     const html = render(2);
-    expect(html).toContain('alt="Synthetic first visit:');
-    expect(html).toContain('alt="Synthetic later visit:');
+    expect(html).toContain('alt="Real pump before cleaning:');
+    expect(html).toContain('alt="Real pump after cleaning:');
   });
   it('puts sample and upload entry points only on the last screen', () => {
     expect(render(4)).toContain('Explore the sample');

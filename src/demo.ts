@@ -1,16 +1,22 @@
 import type { Workspace } from './domain';
-// Entirely synthetic fixture. No customer site imagery or operational records.
+export const photoSources = {
+  before: 'https://commons.wikimedia.org/wiki/File:Close_view_of_pump.JPG',
+  after: 'https://commons.wikimedia.org/wiki/File:Clean_pump.JPG',
+};
+// Source EXIF calendar dates, not verified inspection dates. P-001 is a demo ID.
 export function demoWorkspace(): Workspace {
-  return { version: 1, name: 'North plant / Mechanical room', demo: true, commits: [], captures: [
-    { id: 'baseline', title: 'Baseline walkthrough', capturedAt: '2026-09-16T09:00:00Z', image: './demo-before.svg', observations: [
-      { assetId: 'P-001', label: 'Circulation pump', condition: 'Paint intact; no visible surface staining', x: .31, y: .66 },
-      { assetId: 'V-002', label: 'Isolation valve', condition: 'Pipe section uninsulated', x: .67, y: .36 },
-      { assetId: 'T-003', label: 'Service toolbox', condition: 'Visible on floor beside pump', x: .76, y: .81 },
+  return { version: 1, name: 'Pump cleaning / Photo study', demo: true, commits: [], captures: [
+    { id: 'baseline', title: 'Before cleaning · source photo', capturedAt: '2009-02-11T12:00:00', image: './pump-before.jpg', observations: [
+      { assetId: 'P-001', label: 'Pump housing', condition: 'Heavy deposits cover the internal housing around the shaft opening. The underlying surface cannot be fully assessed in this photo.', x: .34, y: .49 },
     ] },
-    { id: 'followup', title: 'Follow-up walkthrough', capturedAt: '2026-09-23T09:15:00Z', image: './demo-after.svg', observations: [
-      { assetId: 'P-001', label: 'Circulation pump', condition: 'Brown surface staining visible on casing', x: .31, y: .66 },
-      { assetId: 'V-002', label: 'Isolation valve', condition: 'Pipe section has visible insulation wrap', x: .67, y: .36 },
-      { assetId: 'G-004', label: 'Pressure gauge', condition: 'Gauge visible above pump', x: .39, y: .40 },
+    { id: 'followup', title: 'After cleaning · source photo', capturedAt: '2009-02-18T12:00:00', image: './pump-after.jpg', observations: [
+      { assetId: 'P-001', label: 'Pump housing', condition: 'Much of the deposit layer is removed, exposing an uneven, pitted internal surface. Cleaning is documented; restored serviceability is not established.', x: .38, y: .56 },
     ] },
   ] };
+}
+
+export function initialWorkspace(saved?: Workspace): Workspace {
+  // Never replace personal captures or saved reviews. Legacy images remain available.
+  if (!saved || (saved.demo && !saved.commits.length && saved.captures.every(c => c.image === './demo-before.svg' || c.image === './demo-after.svg'))) return demoWorkspace();
+  return saved;
 }

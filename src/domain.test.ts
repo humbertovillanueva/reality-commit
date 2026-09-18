@@ -10,7 +10,9 @@ const fixture = () => {
 describe('Evidence comparison', () => {
   it('detects condition, newly observed, and unobserved assets', () => {
     const w = demoWorkspace();
-    expect(compareCaptures(w.captures[0], w.captures[1]).map(c => c.kind)).toEqual(['condition-changed', 'condition-changed', 'newly-observed', 'not-observed']);
+    w.captures[0].observations.push({assetId:'old',label:'Old asset',condition:'Recorded',x:0,y:0});
+    w.captures[1].observations.push({assetId:'new',label:'New asset',condition:'Recorded',x:0,y:0});
+    expect(compareCaptures(w.captures[0], w.captures[1]).map(c => c.kind)).toEqual(['condition-changed', 'newly-observed', 'not-observed']);
   });
   it('does not claim movement from image coordinates', () => {
     const a = demoWorkspace().captures[0]; const b = structuredClone(a);
