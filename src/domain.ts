@@ -1,10 +1,19 @@
 export type Observation = { assetId: string; label: string; condition: string; x: number; y: number };
-export type Capture = { id: string; title: string; capturedAt: string; image: string; observations: Observation[] };
+export type Capture = { id: string; title: string; capturedAt: string; image: string; observations: Observation[]; imageView?: 'left-half' | 'right-half'; sourceSequence?: { series: string; order: number } };
 export type ChangeKind = 'newly-observed' | 'not-observed' | 'condition-changed';
 export type Change = { id: string; assetId: string; label: string; kind: ChangeKind; before?: Observation; after?: Observation };
 export type Decision = { status: 'accepted' | 'rejected' | 'needs-evidence'; note: string };
 export type Commit = { id: string; createdAt: string; title: string; reviewer: string; beforeId: string; afterId: string; changes: Change[]; decisions: Record<string, Decision> };
 export type Workspace = { version: 1; name: string; demo: boolean; captures: Capture[]; commits: Commit[] };
+
+// Some archival examples establish sequence but supply no trustworthy capture dates.
+// Only curated demos can use source ordering; personal captures still require dates.
+export function chronologicalPair(before: Capture, after: Capture, demo = false): boolean {
+  if (before.id === after.id) return false;
+  if (before.capturedAt && after.capturedAt) return Date.parse(before.capturedAt) < Date.parse(after.capturedAt);
+  const a = before.sourceSequence, b = after.sourceSequence;
+  return !!(demo && a && b && a.series === b.series && Number.isFinite(a.order) && Number.isFinite(b.order) && a.order < b.order);
+}
 
 // IDs, not appearance or image coordinates, establish identity in v0.1.
 // A different camera position is not evidence that an object moved.
@@ -24,7 +33,7 @@ export function createCommit(workspace: Workspace, beforeId: string, afterId: st
   const before = workspace.captures.find(c => c.id === beforeId);
   const after = workspace.captures.find(c => c.id === afterId);
   if (!before || !after || beforeId === afterId) throw new Error('Choose two different captures.');
-  if (Date.parse(before.capturedAt) >= Date.parse(after.capturedAt)) throw new Error('The current capture must be later than the baseline.');
+  if (!chronologicalPair(before, after, workspace.demo)) throw new Error('The current capture must be later than the baseline.');
   if (!title.trim() || !reviewer.trim()) throw new Error('Add a commit message and reviewer name.');
   if (workspace.commits.some(c => c.beforeId === beforeId && c.afterId === afterId)) throw new Error('This comparison is already committed.');
   const changes = compareCaptures(before, after);

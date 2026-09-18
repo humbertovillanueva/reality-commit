@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Box, Camera, Check, CheckCheck, ChevronRight, CircleHelp, Clock3, FileCheck2, GitCommitHorizontal, GitCompareArrows, Layers3, Plus, ScanLine, ShieldCheck, X } from 'lucide-react';
-import { compareCaptures, createCommit, kindLabel, type Capture, type Change, type Decision, type Observation, type Workspace } from './domain';
-import { demoWorkspace, initialWorkspace } from './demo';
+import { compareCaptures, createCommit, chronologicalPair, kindLabel, type Capture, type Change, type Decision, type Observation, type Workspace } from './domain';
+import { demoWorkspace, initialWorkspace, sampleId, workspaceKey, type SampleId } from './demo';
 import DemoContext, { PhotoCredits } from './DemoContext';
-import { loadWorkspace, saveWorkspace } from './storage';
+import { loadWorkspace, saveWorkspace, savedWorkspaceKeys, switchWorkspace } from './storage';
 import Welcome from './Welcome';
+import SamplePicker from './SamplePicker';
+import CaptureImage from './CaptureImage';
 
-const date = (value: string) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const date = (value: string) => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date not supplied';
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong.';
 type View = 'compare' | 'assets' | 'history';
 
@@ -14,6 +16,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(() => window.location.hash !== '#workspace');
   const navigationFocus = useRef(false);
   const [workspace, setWorkspace] = useState<Workspace>();
+  const [savedKeys, setSavedKeys] = useState<string[]>([]);
   const [view, setView] = useState<View>('compare');
   const [beforeId, setBeforeId] = useState('baseline');
   const [afterId, setAfterId] = useState('followup');
@@ -45,27 +48,48 @@ export default function App() {
     navigationFocus.current = true;
     window.location.hash = 'workspace';
     setShowWelcome(false);
-    if (capture) setUpload(true);
+    if (capture) void beginCapture();
   }
-  useEffect(() => { loadWorkspace().then(saved => {
+  useEffect(() => { Promise.all([loadWorkspace(), savedWorkspaceKeys()]).then(([saved, keys]) => {
+    setSavedKeys(keys);
     const w = initialWorkspace(saved); setWorkspace(w);
     setBeforeId(w.captures.at(-2)?.id ?? w.captures[0]?.id ?? ''); setAfterId(w.captures.at(-1)?.id ?? '');
   }).catch(() => { setWorkspace(demoWorkspace()); setError('Browser storage is unavailable. Changes cannot be saved until storage is enabled.'); }); }, []);
 
   async function persist(next: Workspace) {
     setBusy(true);
-    try { await saveWorkspace(next); setWorkspace(next); setError(''); return true; }
+    try { await saveWorkspace(next); setWorkspace(next); setSavedKeys(keys => [...new Set([...keys, workspaceKey(next)])]); setError(''); return true; }
     catch (e) { setError(`Could not save: ${message(e)} Your previous workspace is unchanged. Export a backup before clearing browser data.`); return false; }
     finally { setBusy(false); }
+  }
+  async function chooseWorkspace(key: string, sample?: SampleId) {
+    if (!workspace || busy) return false;
+    if (workspaceKey(workspace) === key) return true;
+    if (Object.keys(decisions).length && !window.confirm('Switch examples and discard this unsaved review? Saved commits are preserved.')) return false;
+    setBusy(true);
+    try {
+      const next = await switchWorkspace(workspace, key, sample);
+      setSavedKeys(keys => [...new Set([...keys, workspaceKey(workspace), key])]);
+      setWorkspace(next); setBeforeId(next.captures.at(-2)?.id ?? next.captures[0]?.id ?? ''); setAfterId(next.captures.at(-1)?.id ?? '');
+      setDecisions({}); setSelected(undefined); setActiveAsset(undefined); setInspectCommit(undefined); setView('compare'); setError('');
+      return true;
+    } catch (e) { setError(message(e)); return false; } finally { setBusy(false); }
+  }
+  async function beginCapture() {
+    if (busy) return;
+    // Adding photos from a sample resumes the user's own records, never overwrites them.
+    if (workspace?.demo && savedKeys.includes('personal') && !await chooseWorkspace('personal')) return;
+    setUpload(true);
   }
   function choosePair(side: 'before' | 'after', id: string) {
     if (Object.keys(decisions).length && !window.confirm('Switch captures and discard this unsaved review?')) return;
     side === 'before' ? setBeforeId(id) : setAfterId(id); setDecisions({}); setSelected(undefined);
   }
   if (!workspace) return <div className="loading"><ScanLine size={32}/><p>Opening your workspace…</p></div>;
+  const activeSample = sampleId(workspace);
   const before = workspace.captures.find(c => c.id === beforeId);
   const after = workspace.captures.find(c => c.id === afterId);
-  const validPair = !!before && !!after && before.id !== after.id && Date.parse(before.capturedAt) < Date.parse(after.capturedAt);
+  const validPair = !!before && !!after && chronologicalPair(before, after, workspace.demo);
   const changes = validPair ? compareCaptures(before!, after!) : [];
   const existing = workspace.commits.find(c => c.beforeId === beforeId && c.afterId === afterId);
   const review = existing?.decisions ?? decisions;
@@ -107,13 +131,14 @@ export default function App() {
       <header className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/><b>{workspace.name}</b></div><div className="top-actions"><span className="local-dot"/> Local storage <a href="https://github.com/humbertovillanueva/reality-commit" target="_blank" rel="noreferrer">GitHub ↗</a></div></header>
       <div className="main-content">
         {error && <div role="alert" className="error">{error}<button aria-label="Dismiss error" onClick={() => setError('')}><X size={16}/></button></div>}
-        <div className="page-heading"><div><div className="eyebrow">{view === 'compare' ? 'OBSERVE → REVIEW → COMMIT' : 'THE RECORD OF REALITY'}</div><h1>{view === 'compare' ? 'What changed?' : view === 'assets' ? 'Every asset has a story.' : 'A history you can inspect.'}</h1><p>{view === 'compare' ? 'Turn separate site visits into a continuous, evidence-backed history.' : view === 'assets' ? 'Persistent identities connect observations across captures.' : 'Reviewed changes, their evidence, and the person who confirmed them.'}</p></div><button className="primary" onClick={() => setUpload(true)}><Plus size={17}/> New capture</button></div>
-        {workspace.demo && <div className="demo-banner"><span><span className="badge">SAMPLE WORKSPACE</span> {workspace.captures[0]?.image === './pump-before.jpg' ? 'Real photographs · manually written observations · not a certified inspection.' : 'Legacy illustrated sample · saved reviews preserved.'}</span><button onClick={() => setUpload(true)}>Try your own images <ArrowRight size={15}/></button></div>}
+        <div className="page-heading"><div><div className="eyebrow">{view === 'compare' ? 'OBSERVE → REVIEW → COMMIT' : 'THE RECORD OF REALITY'}</div><h1>{view === 'compare' ? 'What changed?' : view === 'assets' ? 'Every asset has a story.' : 'A history you can inspect.'}</h1><p>{view === 'compare' ? 'Turn separate site visits into a continuous, evidence-backed history.' : view === 'assets' ? 'Persistent identities connect observations across captures.' : 'Reviewed changes, their evidence, and the person who confirmed them.'}</p></div><button className="primary" onClick={() => void beginCapture()}><Plus size={17}/> New capture</button></div>
+        <SamplePicker workspace={workspace} busy={busy} savedKeys={savedKeys} onChoose={chooseWorkspace} />
+        {workspace.demo && <div className="demo-banner"><span><span className="badge">SAMPLE WORKSPACE</span> {activeSample ? 'Real photographs · manually written observations · not a certified inspection.' : 'Legacy illustrated sample · saved reviews preserved.'}</span><button onClick={() => void beginCapture()}>Try your own images <ArrowRight size={15}/></button></div>}
         {view === 'compare' && <>
           <div className="comparison-toolbar"><div className="pair"><label>BASELINE<select aria-label="Baseline capture" value={beforeId} onChange={e => choosePair('before', e.target.value)}>{workspace.captures.map(c => <option value={c.id} key={c.id}>{c.title} · {date(c.capturedAt)}</option>)}</select></label><ArrowRight size={18}/><label>CURRENT<select aria-label="Current capture" value={afterId} onChange={e => choosePair('after', e.target.value)}>{workspace.captures.map(c => <option value={c.id} key={c.id}>{c.title} · {date(c.capturedAt)}</option>)}</select></label></div><span className="comparison-status">{existing ? '✓ Committed' : 'Awaiting review'}</span></div>
-          {!validPair ? <div className="empty"><Camera size={36}/><h2>{workspace.captures.length < 2 ? 'Your baseline is ready.' : 'Choose a chronological pair.'}</h2><p>{workspace.captures.length < 2 ? 'Add a later capture of the same space. Reuse asset IDs to compare observations.' : 'Choose two different captures with the baseline earlier than the current visit.'}</p><button className="primary" onClick={() => setUpload(true)}>Add capture</button></div> : <>
+          {!validPair ? <div className="empty"><Camera size={36}/><h2>{workspace.captures.length < 2 ? 'Your baseline is ready.' : 'Choose a chronological pair.'}</h2><p>{workspace.captures.length < 2 ? 'Add a later capture of the same space. Reuse asset IDs to compare observations.' : 'Choose two different captures with the baseline earlier than the current visit.'}</p><button className="primary" onClick={() => void beginCapture()}>Add capture</button></div> : <>
             <div className="evidence-grid"><Evidence capture={before!} observation={current?.before} label="01 / BEFORE"/><Evidence capture={after!} observation={current?.after} label="02 / AFTER"/></div>
-            {workspace.demo && before?.image === './pump-before.jpg' && <><p className="photo-credits"><PhotoCredits /> · Dates from source EXIF.</p><DemoContext /></>}<div className="review-layout"><section className="change-list"><div className="section-title"><h2>Proposed changes <span>{changes.length}</span></h2><small>{pending} need review</small></div>{!changes.length && <p className="empty-copy">No differences in recorded observations. This does not establish that the physical space is unchanged.</p>}{changes.map((c, i) => <button key={c.id} className={`change-row ${current?.id === c.id ? 'selected' : ''}`} onClick={() => setSelected(c.id)}><span className={`change-symbol ${c.kind}`}>{c.kind === 'newly-observed' ? '+' : c.kind === 'not-observed' ? '?' : '↗'}</span><span className="change-copy"><b>{c.label}</b><small>{c.assetId} <span>·</span> {kindLabel[c.kind]}</small></span><span className="row-status">{review[c.id]?.status === 'accepted' ? <Check size={16}/> : review[c.id]?.status === 'rejected' ? <X size={16}/> : <span>0{i+1}</span>}</span></button>)}</section>
+            {activeSample && <><p className="photo-credits"><PhotoCredits sample={activeSample} /> · {activeSample === 'pump' ? 'Dates from source EXIF.' : 'Source-ordered sequence; capture dates unknown.'}</p><DemoContext sample={activeSample} /></>}<div className="review-layout"><section className="change-list"><div className="section-title"><h2>Proposed changes <span>{changes.length}</span></h2><small>{pending} need review</small></div>{!changes.length && <p className="empty-copy">No differences in recorded observations. This does not establish that the physical space is unchanged.</p>}{changes.map((c, i) => <button key={c.id} className={`change-row ${current?.id === c.id ? 'selected' : ''}`} onClick={() => setSelected(c.id)}><span className={`change-symbol ${c.kind}`}>{c.kind === 'newly-observed' ? '+' : c.kind === 'not-observed' ? '?' : '↗'}</span><span className="change-copy"><b>{c.label}</b><small>{c.assetId} <span>·</span> {kindLabel[c.kind]}</small></span><span className="row-status">{review[c.id]?.status === 'accepted' ? <Check size={16}/> : review[c.id]?.status === 'rejected' ? <X size={16}/> : <span>0{i+1}</span>}</span></button>)}</section>
             <section className="review-panel">{current ? <><div className="section-title"><span className="eyebrow">EVIDENCE REVIEW</span><span className="badge">{current.assetId}</span></div><h2>{current.label}</h2><p className="review-description">{current.kind === 'not-observed' ? 'This asset was not annotated in the current capture. It may be obscured or outside the frame; removal is not established.' : current.kind === 'newly-observed' ? 'This asset appears in the current annotations. Its installation date is not established.' : 'The recorded condition differs between visits. Review the source images before accepting.'}</p><dl><dt>BEFORE</dt><dd>{current.before?.condition ?? 'No recorded observation'}</dd><dt>AFTER</dt><dd>{current.after?.condition ?? 'No recorded observation'}</dd></dl><label className="field">Verification note<textarea aria-label="Verification note" disabled={!!existing} value={review[current.id]?.note ?? ''} placeholder="What does the evidence establish? Required to accept." onChange={e => setDecisions({ ...decisions, [current.id]: { status: decisions[current.id]?.status ?? 'needs-evidence', note: e.target.value } })}/></label><div className="decision-actions">{(['accepted', 'rejected', 'needs-evidence'] as const).map(status => <button disabled={!!existing} className={review[current.id]?.status === status ? 'chosen' : ''} key={status} onClick={() => setDecisions({ ...decisions, [current.id]: { status, note: decisions[current.id]?.note ?? '' } })}>{status === 'accepted' ? <Check size={15}/> : status === 'rejected' ? <X size={15}/> : <CircleHelp size={15}/>} {status === 'accepted' ? 'Accept' : status === 'rejected' ? 'Reject' : 'Need evidence'}</button>)}</div></> : <><ShieldCheck/><h2>No proposals to review</h2><p>Comparison uses your asset IDs and condition notes. Automatic visual recognition is planned.</p></>}</section></div>
             <footer className="commit-bar"><div><GitCommitHorizontal size={22}/><span><b>{existing ? 'This comparison is committed' : `${accepted} accepted · ${pending} unresolved`}</b><small>{existing ? `Reviewed by ${existing.reviewer}` : 'Only reviewed observations enter the record.'}</small></span></div><button className="primary" disabled={!!existing || !changes.length || pending > 0 || busy} onClick={() => {setCommitTitle(''); setCommitOpen(true);}}><CheckCheck size={17}/> Commit review</button></footer>
           </>}
@@ -129,7 +154,7 @@ export default function App() {
 }
 
 function Evidence({ capture, observation, label }: { capture: Capture; observation?: Observation; label: string }) {
-  return <figure className="evidence"><figcaption><span>{label}</span><span><Clock3 size={12}/> {date(capture.capturedAt)}</span></figcaption><div className="evidence-image"><img src={capture.image} alt={`${capture.title}: captured evidence`}/>{observation && <span className="evidence-pin" style={{ left: `${observation.x*100}%`, top: `${observation.y*100}%` }}><span/><b>{observation.assetId}</b></span>}<span className="capture-title"><Camera size={13}/>{capture.title}</span></div></figure>;
+  return <figure className="evidence"><figcaption><span>{label}</span><span><Clock3 size={12}/> {date(capture.capturedAt)}</span></figcaption><div className="evidence-image"><CaptureImage image={capture.image} imageView={capture.imageView} alt={`${capture.title}: captured evidence`}/>{observation && <span className="evidence-pin" style={{ left: `${observation.x*100}%`, top: `${observation.y*100}%` }}><span/><b>{observation.assetId}</b></span>}<span className="capture-title"><Camera size={13}/>{capture.title}</span></div></figure>;
 }
 
 function CaptureDialog({ workspace, busy, onClose, onSave }: { workspace: Workspace; busy: boolean; onClose: () => void; onSave: (c: Capture, name: string) => Promise<void> }) {

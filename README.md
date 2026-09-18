@@ -13,7 +13,7 @@ Reality Commit explores version control for the physical world, starting with me
 - Upload your own photographs and manually annotate stable asset IDs.
 - Store captures and reviews in browser IndexedDB; export the workspace as JSON.
 
-**This is an early, local-first prototype, not an automated inspection system.** The sample uses public-domain pump photographs with manually written educational observations; see [photo provenance and limits](docs/image-sources.md). Comparison currently uses manually recorded asset IDs and condition notes, not AI image recognition. Reviewer names and capture times are self-reported. Commits are local snapshots, not cryptographically signed records.
+**This is an early, local-first prototype, not an automated inspection system.** The sample uses public-domain pump and bridge photographs with manually written educational observations; see [photo provenance and limits](docs/image-sources.md). Comparison currently uses manually recorded asset IDs and condition notes, not AI image recognition. Reviewer names and capture times are self-reported. Commits are local snapshots, not cryptographically signed records.
 
 ## Run locally
 
@@ -37,9 +37,9 @@ npm run build
 
 The introduction is a five-screen walkthrough: Welcome → Capture → Compare → Remember → Get started. Next, Back, and clickable progress indicators move between screens; each step has a bookmarkable URL (`/#intro/1` through `/#intro/5`) and supports browser Back. The logo animation respects reduced-motion preferences and never delays entry. Skip intro opens the workspace immediately. The final screen explains manual observations and browser-only storage, then offers a sample workspace or photo upload. Returning visitors can continue their saved work. The workspace logo returns to the introduction; `/#workspace` opens the workspace directly.
 
-1. Explore the condition-change proposal in the sample workspace.
+1. Choose **Pump cleaning** or **Bridge rehabilitation** in the sample selector. The pump has one condition-change proposal; the bridge has two. Each sample keeps its own saved reviews. Switching away from personal photos preserves them; use **Return to my photos & reviews** to resume.
 2. Write a verification note, then accept a proposal—or reject it.
-3. Resolve the proposal and select **Commit review**.
+3. Resolve each proposal and select **Commit review**.
 4. Enter a message and reviewer name. Inspect the saved record in **Commit history**.
 5. To use your own evidence, select **New capture**. The first real upload replaces the sample. Upload two dated photographs, reusing the same asset IDs across visits.
 
