@@ -4,6 +4,8 @@
 
 Reality Commit explores version control for the physical world, starting with mechanical rooms and facility maintenance. A photo tells you what a place looked like. A reviewed sequence tells you what changed—and what the evidence actually supports.
 
+[Live demo](https://reality-commit.vercel.app/) · [Architecture](docs/architecture.md) · [Photo provenance](docs/image-sources.md)
+
 ## First working slice
 
 - Compare two captures side by side with asset markers.
